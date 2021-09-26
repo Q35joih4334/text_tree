@@ -4,7 +4,7 @@ setup(
    name='text_tree',
    version='0.1.1',
    author='Q35joih4334',
-   author_email='',
+   author_email='Q35joih4334@gmail.com',
    packages=['text_tree'],
    url='https://github.com/Q35joih4334/text_tree',
    license='LICENSE.txt',
