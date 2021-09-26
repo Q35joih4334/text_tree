@@ -13,14 +13,14 @@ texts = ['Sentence one starts with the same word as sentence two. Sentence two c
 t, s = text_tree.draw_tree(texts, [{'LOWER': 'sentence'}], 'simple_example.png')
 '''
 
-![Simple example](tests/simple_example.png)
+![Simple example](test/simple_example.png)
 
 ```python
 texts = ['Tree can also be reversed. The root word will be positioned on the right when tree is reversed. Currently, punctuation in the end of the sentences is disregarded when tree orientation is reversed.']
 t, s = text_tree.draw_tree(texts, [{'LOWER': 'reversed'}], 'simple_example_reversed.png', reverse=True)
 ```
 
-![Reverse example](tests/simple_example_reversed.png)
+![Reverse example](test/simple_example_reversed.png)
 
 ```python
 texts = ['Tree can also be reversed. Tree root word will be positioned on the right when tree is reversed. Currently, punctuation in the end of the sentences is disregarded when tree orientation is reversed.',
@@ -28,7 +28,7 @@ texts = ['Tree can also be reversed. Tree root word will be positioned on the ri
 t, s = text_tree.draw_tree(texts, [{'LOWER': 'tree'}], 'simple_example_highlights_refs.png', highlights=['tree', 'can', 'revers'], doc_refs=['first document', 'second document'])
 ```
 
-![Highlight and refs example](tests/simple_example_highlights_refs.png)
+![Highlight and refs example](test/simple_example_highlights_refs.png)
 
 ## Current issues
 Text clean-up is not robust, input text should already be cleaned (e.g., \n removed, etc.).
