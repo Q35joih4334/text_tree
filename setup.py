@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
    name='text_tree',
-   version='0.1.0',
+   version='0.1.1',
    author='Q35joih4334',
    author_email='',
    packages=['text_tree'],

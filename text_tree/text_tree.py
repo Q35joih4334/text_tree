@@ -203,6 +203,7 @@ def default_treestyle(tree,
                 node.delete()
 
         # Remove any amount of newlines from node labels
+        # TODO: this will break if newlines are in the middle of sentence
         if set(node._text) == set('\n'):
             node.delete()
 
