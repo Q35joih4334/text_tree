@@ -214,6 +214,7 @@ def default_treestyle(tree,
         node.img_style["hz_line_color"] = '#FFFFFFFF'
         node.img_style['size'] = 0
 
+    # TODO: these params should be accessible from default_treestyle
     def text_tree_default_layout(node, 
                                  node_margin=.5, 
                                  space_margin=5, 
@@ -244,7 +245,7 @@ def default_treestyle(tree,
         # Handle font size change depending on leave count under the node
         # Limit fontsize
         leaf_count = len(node.get_leaves())
-        name_face.fsize =  sorted([fontsize_min, leaf_count * 8, fontsize_max])[1]
+        name_face.fsize =  sorted([fontsize_min, leaf_count * fontsize_min, fontsize_max])[1]
 
         # Handle highlighting
         bgcolor = (1, 1, 1, 1)
