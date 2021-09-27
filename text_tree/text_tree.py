@@ -214,7 +214,12 @@ def default_treestyle(tree,
         node.img_style["hz_line_color"] = '#FFFFFFFF'
         node.img_style['size'] = 0
 
-    def text_tree_default_layout(node, node_margin=.5, space_margin=5, branch_margin=10):
+    def text_tree_default_layout(node, 
+                                 node_margin=.5, 
+                                 space_margin=5, 
+                                 branch_margin=10, 
+                                 fontsize_min=8, 
+                                 fontsize_max=48):
 
         name_face = ete3.TextFace(node._text)
 
@@ -235,13 +240,11 @@ def default_treestyle(tree,
 
         if len(node.get_children()) > 1: #junction
             name_face.margin_right = branch_margin
-
-        # TODO: changing node sizes will not work if there are multiple words
-        #       in same position (e.g., ngram root/junction)
-        #       to address this, the same style should be applied to all adjacent nodes
-        # if node.is_root():
-        #     name_face.fsize = 24
-        #     name_face.text = name_face.text.upper()
+        
+        # Handle font size change depending on leave count under the node
+        # Limit fontsize
+        leaf_count = len(node.get_leaves())
+        name_face.fsize =  sorted([fontsize_min, leaf_count * 8, fontsize_max])[1]
 
         # Handle highlighting
         bgcolor = (1, 1, 1, 1)
