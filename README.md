@@ -33,6 +33,27 @@ t, s = text_tree.draw_tree(texts, [{'LOWER': 'tree'}], 'simple_example_highlight
 
 ![Highlight and refs example](test/simple_example_highlights_refs.png)
 
+```python
+from text_tree import text_tree
+import textacy.datasets
+
+ds = textacy.datasets.IMDB()
+ds.download()
+texts = []
+refs = []
+for i, record in enumerate(ds.records(limit=30)):
+    texts.append(record.text.replace('\n', ''))
+    refs.append('{} {}'.format(record.meta['movie_id'], i))
+
+text_tree.draw_tree(
+    texts,
+    [{'LOWER': 'i'}],
+    output_file='IMDB_tree.png',
+    doc_refs=refs)
+```
+
+![IMDB example](test/IMDB_tree.png)
+
 ## Current issues
 Text clean-up is not robust, input text should already be cleaned (e.g., \n removed, etc.).
 
