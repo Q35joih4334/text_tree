@@ -31,20 +31,26 @@ t, s = text_tree.draw_tree(texts,
                            highlights=['tree', 'can', 'revers'],
                            doc_refs=['first document', 'second document'])
 
-# Build textacy dataset
-# NOTE: it would be preferable if the datset was static for testing
+# Tests with textacy IMDB dataset
+# -------------------------------
+
 ds = textacy.datasets.IMDB()
 ds.download()
 texts = []
 refs = []
-for i, record in enumerate(ds.records(limit=65)):
-    texts.append(record.text)
+for i, record in enumerate(ds.records(limit=30)):
+    texts.append(record.text.replace('\n', ''))
     refs.append('{} {}'.format(record.meta['movie_id'], i))
     
+# Run single test
+text_tree.draw_tree(
+    texts,
+    [{'LOWER': 'i'}],
+    output_file='IMDB_tree.png',
+    doc_refs=refs)
 
-# Run tests
-# ---------
 
+# Run tests in loop
 params = {
     'rootword_pattern': [
         [{'LOWER': 'the'}],

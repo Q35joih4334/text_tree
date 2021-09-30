@@ -35,6 +35,8 @@ def segment_matching_sents(doc_texts,
         doc_texts: text as a list of strings
 
         rootword_pattern: pattern to be input to spacy.matcher
+        
+        reverse (default: False): reverse root matching
 
         nlp (optional): spacy nlp object (default: loads spacy en_core_web_sm)
 
@@ -47,7 +49,8 @@ def segment_matching_sents(doc_texts,
         raise TypeError('doc_texts argument must be list')
 
     if not nlp:
-        nlp = spacy.load('en_core_web_sm', disable=['ner', 'tagger', 'textcat', 'lemmatizer'])
+        nlp = spacy.load('en_core_web_sm', 
+                         disable=['ner', 'tagger', 'textcat', 'lemmatizer'])
 
     matcher = spacy.matcher.Matcher(nlp.vocab)
     matcher.add('rootword', [rootword_pattern])
@@ -57,6 +60,10 @@ def segment_matching_sents(doc_texts,
     for text in doc_texts:
 
         sent_tokens = []
+
+        # NOTE: this might be unsafe if text length is really long
+        # TODO: maybe there could be a safer way to do this?
+        nlp.max_length = len(text)
 
         doc = nlp(text)
 
@@ -96,7 +103,13 @@ def segment_matching_sents(doc_texts,
 
                     sent_tokens.append(tokens)
 
-            doc_sents.append(sent_tokens)
+        # NOTE: All docs are included, regardless of whether matching 
+        # sentences are found or not. The reason for this is ensuring that
+        # doc_sents, doc_refs and doc_attrs are always of equal length.
+        # TODO: this is a bit ugly solution, maybe doc_sents, doc_refs and 
+        # doc_attrs should be concatenated into list of dicts first?
+        # Current solution also leaves empty lists in doc_sents
+        doc_sents.append(sent_tokens)
 
     return doc_sents
 
@@ -106,7 +119,7 @@ def segment_matching_sents(doc_texts,
 #       ete3 doesn't have a test for tree?
 def tree_from_list(doc_sents,
                    doc_refs=None,
-                   sents_attrs=None):
+                   doc_attrs=None):
 
     """
     Returns ete3 Tree from a list of lists containing sentences.
@@ -120,11 +133,11 @@ def tree_from_list(doc_sents,
 
     Input:
 
-        sent_lists (list of lists): sentences (required)
+        doc_sents (list of lists): sentences (required)
 
-        sent_refs (list of strings): reference for each sentence (optional)
+        doc_refs (list of strings): reference for each sentence (optional)
 
-        sents_attrs (list of dicts): node attributes to be added to ete3 Tree nodes
+        doc_attrs (list of dicts): node attributes to be added to ete3 Tree nodes
 
     Output:
 
@@ -134,42 +147,43 @@ def tree_from_list(doc_sents,
     if not doc_refs:
         doc_refs = [None for x in range(len(doc_sents))]
 
-    if not sents_attrs:
-        sents_attrs = [{} for x in range(len(doc_sents))]
+    if not doc_attrs:
+        doc_attrs = [{} for x in range(len(doc_sents))]
 
     parent_child_table = []
     node_features = {}
 
-    for doc_sent_i, doc_sent in enumerate(doc_sents):
-
-        for sent_tokens_i, sent_tokens in enumerate(doc_sent):
-
-            # Create (cumulative) sentence structure
-            # Also create node attribute data
-            sent_node_names = []
-            for sent_token_i, sent_token in enumerate(sent_tokens):
-
-                cumulative_tokens = sent_tokens[0:sent_token_i + 1]
-                node_name = ''.join([x['_text'] for x in cumulative_tokens]).lower()
-
-                attrs = sent_token.copy()
-                attrs.update({
-                    '_node_name': node_name,
-                    '_simple_label': _multi_replace(node_name,
-                                                    '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~–'),
-                    '_ref': doc_refs[doc_sent_i]})
-
-                sent_node_names.append(node_name)
-                node_features[node_name] = attrs
-
-            # Create parent_child_table for ete3 Tree
-            for i in range(len(sent_node_names) - 1):
-
-                parent = sent_node_names[i]
-                child = sent_node_names[i + 1]
-
-                if parent != child:
-                    parent_child_table.append((parent, child, 0))
+    for doc_sent, doc_ref, doc_attr in zip(doc_sents, doc_refs, doc_attrs):
+        
+            for sent_tokens_i, sent_tokens in enumerate(doc_sent):
+    
+                # Create (cumulative) sentence structure
+                # Also create node attribute data
+                sent_node_names = []
+                for sent_token_i, sent_token in enumerate(sent_tokens):
+    
+                    cumulative_tokens = sent_tokens[0:sent_token_i + 1]
+                    node_name = ''.join([x['_text'] for x in cumulative_tokens]).lower()
+    
+                    attrs = doc_attr.copy() #collect optional attributes
+                    attrs.update(sent_token) #add _text and _whitespace
+                    attrs.update({
+                        '_node_name': node_name,
+                        '_simple_label': _multi_replace(node_name,
+                                                        '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~–'),
+                        '_ref': doc_ref})                
+    
+                    sent_node_names.append(node_name)
+                    node_features[node_name] = attrs
+    
+                # Create parent_child_table for ete3 Tree
+                for i in range(len(sent_node_names) - 1):
+    
+                    parent = sent_node_names[i]
+                    child = sent_node_names[i + 1]
+    
+                    if parent != child:
+                        parent_child_table.append((parent, child, 0))
 
     # Create ete3 Tree and add node attributes
     tree = ete3.Tree.from_parent_child_table(set(parent_child_table))
@@ -202,10 +216,10 @@ def default_treestyle(tree,
             if node._text.strip() == ',' or node._text.strip() == '':
                 node.delete()
 
-        # Remove any amount of newlines from node labels
-        # TODO: this will break if newlines are in the middle of sentence
-        if set(node._text) == set('\n'):
-            node.delete()
+    #     # Remove any amount of newlines from node labels
+    #     # TODO: this will break if newlines are in the middle of sentence
+    #     if set(node._text) == set('\n'):
+    #         node.delete()
 
     # Hide nodes from tree visualization
     for node in tree.traverse():
@@ -304,6 +318,7 @@ def draw_tree(doc_texts,
               output_file,
               reverse=False,
               doc_refs=None,
+              doc_attrs=None,
               highlights=None):
 
     """
@@ -337,6 +352,9 @@ def draw_tree(doc_texts,
 
     if not doc_refs:
         doc_refs = [None for x in range(len(doc_texts))]
+        
+    if not doc_attrs:
+        doc_attrs = [{} for x in range(len(doc_texts))]        
 
     # Extract matching sentences
     print('Extracting matching sentences.', end=' ')
@@ -352,7 +370,7 @@ def draw_tree(doc_texts,
 
     # Make tree
     print('Building tree.')
-    tree = tree_from_list(doc_sents, doc_refs=doc_refs)
+    tree = tree_from_list(doc_sents, doc_refs=doc_refs, doc_attrs=doc_attrs)
 
     # Apply style
     print('Applying style.')
