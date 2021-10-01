@@ -23,7 +23,8 @@ def _multi_replace(s, replaces):
 def segment_matching_sents(doc_texts,
                            rootword_pattern,
                            reverse=False,
-                           nlp=None):
+                           nlp=None,
+                           sent_splitting='rule'):
 
     """
     Matches sentences in text that start or end with rootword pattern. Findgs
@@ -35,10 +36,12 @@ def segment_matching_sents(doc_texts,
         doc_texts: text as a list of strings
 
         rootword_pattern: pattern to be input to spacy.matcher
-        
+
         reverse (default: False): reverse root matching
 
         nlp (optional): spacy nlp object (default: loads spacy en_core_web_sm)
+
+        sent_splitting (dep, stat, rule [DEFAULT]): sentence splitting strategy
 
     Output:
 
@@ -49,8 +52,22 @@ def segment_matching_sents(doc_texts,
         raise TypeError('doc_texts argument must be list')
 
     if not nlp:
-        nlp = spacy.load('en_core_web_sm', 
-                         disable=['ner', 'tagger', 'textcat', 'lemmatizer'])
+
+        # Dependency parse splitting
+        if sent_splitting == 'dep':
+            nlp = spacy.load('en_core_web_sm',
+                             disable=['ner', 'tagger', 'textcat', 'lemmatizer'])
+
+        # Statistical sentence segmenter
+        elif sent_splitting == 'stat':
+            nlp = spacy.load('en_core_web_sm', exclude=["parser"],
+                             disable=['ner', 'tagger', 'textcat', 'lemmatizer'])
+            nlp.enable_pipe('senter')
+
+        # Rule-based pipeline component
+        elif sent_splitting == 'rule':
+            nlp = spacy.lang.en.English()
+            nlp.add_pipe('sentencizer')
 
     matcher = spacy.matcher.Matcher(nlp.vocab)
     matcher.add('rootword', [rootword_pattern])
@@ -103,10 +120,10 @@ def segment_matching_sents(doc_texts,
 
                     sent_tokens.append(tokens)
 
-        # NOTE: All docs are included, regardless of whether matching 
+        # NOTE: All docs are included, regardless of whether matching
         # sentences are found or not. The reason for this is ensuring that
         # doc_sents, doc_refs and doc_attrs are always of equal length.
-        # TODO: this is a bit ugly solution, maybe doc_sents, doc_refs and 
+        # TODO: this is a bit ugly solution, maybe doc_sents, doc_refs and
         # doc_attrs should be concatenated into list of dicts first?
         # Current solution also leaves empty lists in doc_sents
         doc_sents.append(sent_tokens)
@@ -154,36 +171,36 @@ def tree_from_list(doc_sents,
     node_features = {}
 
     for doc_sent, doc_ref, doc_attr in zip(doc_sents, doc_refs, doc_attrs):
-        
-            for sent_tokens_i, sent_tokens in enumerate(doc_sent):
-    
-                # Create (cumulative) sentence structure
-                # Also create node attribute data
-                sent_node_names = []
-                for sent_token_i, sent_token in enumerate(sent_tokens):
-    
-                    cumulative_tokens = sent_tokens[0:sent_token_i + 1]
-                    node_name = ''.join([x['_text'] for x in cumulative_tokens]).lower()
-    
-                    attrs = doc_attr.copy() #collect optional attributes
-                    attrs.update(sent_token) #add _text and _whitespace
-                    attrs.update({
-                        '_node_name': node_name,
-                        '_simple_label': _multi_replace(node_name,
-                                                        '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~–'),
-                        '_ref': doc_ref})                
-    
-                    sent_node_names.append(node_name)
-                    node_features[node_name] = attrs
-    
-                # Create parent_child_table for ete3 Tree
-                for i in range(len(sent_node_names) - 1):
-    
-                    parent = sent_node_names[i]
-                    child = sent_node_names[i + 1]
-    
-                    if parent != child:
-                        parent_child_table.append((parent, child, 0))
+
+        for sent_tokens_i, sent_tokens in enumerate(doc_sent):
+
+            # Create (cumulative) sentence structure
+            # Also create node attribute data
+            sent_node_names = []
+            for sent_token_i, sent_token in enumerate(sent_tokens):
+
+                cumulative_tokens = sent_tokens[0:sent_token_i + 1]
+                node_name = ''.join([x['_text'] for x in cumulative_tokens]).lower()
+
+                attrs = doc_attr.copy() #collect optional attributes
+                attrs.update(sent_token) #add _text and _whitespace
+                attrs.update({
+                    '_node_name': node_name,
+                    '_simple_label': _multi_replace(node_name,
+                                                    '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~–'),
+                    '_ref': doc_ref})
+
+                sent_node_names.append(node_name)
+                node_features[node_name] = attrs
+
+            # Create parent_child_table for ete3 Tree
+            for i in range(len(sent_node_names) - 1):
+
+                parent = sent_node_names[i]
+                child = sent_node_names[i + 1]
+
+                if parent != child:
+                    parent_child_table.append((parent, child, 0))
 
     # Create ete3 Tree and add node attributes
     tree = ete3.Tree.from_parent_child_table(set(parent_child_table))
@@ -229,11 +246,11 @@ def default_treestyle(tree,
         node.img_style['size'] = 0
 
     # TODO: these params should be accessible from default_treestyle
-    def text_tree_default_layout(node, 
-                                 node_margin=.5, 
-                                 space_margin=5, 
-                                 branch_margin=10, 
-                                 fontsize_min=8, 
+    def text_tree_default_layout(node,
+                                 node_margin=.5,
+                                 space_margin=5,
+                                 branch_margin=10,
+                                 fontsize_min=8,
                                  fontsize_max=48):
 
         name_face = ete3.TextFace(node._text)
@@ -255,11 +272,11 @@ def default_treestyle(tree,
 
         if len(node.get_children()) > 1: #junction
             name_face.margin_right = branch_margin
-        
+
         # Handle font size change depending on leave count under the node
         # Limit fontsize
         leaf_count = len(node.get_leaves())
-        name_face.fsize =  sorted([fontsize_min, leaf_count * fontsize_min, fontsize_max])[1]
+        name_face.fsize = sorted([fontsize_min, leaf_count * fontsize_min, fontsize_max])[1]
 
         # Handle highlighting
         bgcolor = (1, 1, 1, 1)
@@ -352,9 +369,9 @@ def draw_tree(doc_texts,
 
     if not doc_refs:
         doc_refs = [None for x in range(len(doc_texts))]
-        
+
     if not doc_attrs:
-        doc_attrs = [{} for x in range(len(doc_texts))]        
+        doc_attrs = [{} for x in range(len(doc_texts))]
 
     # Extract matching sentences
     print('Extracting matching sentences.', end=' ')
