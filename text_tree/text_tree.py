@@ -186,8 +186,7 @@ def tree_from_list(doc_sents,
                 attrs.update(sent_token) #add _text and _whitespace
                 attrs.update({
                     '_node_name': node_name,
-                    '_simple_label': _multi_replace(node_name,
-                                                    '!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~–'),
+                    '_simple_label': ''.join(filter(str.isalnum, node_name)),
                     '_ref': doc_ref})
 
                 sent_node_names.append(node_name)
