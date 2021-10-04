@@ -203,7 +203,7 @@ def tree_from_list(doc_sents,
 
                 node_name = '_'.join([str(x['_id']) for x in cumulative_tokens])
 
-                simple_label = ''.join([str(x['_token_text']) for x in cumulative_tokens])
+                simple_label = ''.join([x['_token_text'].lower() for x in cumulative_tokens])
                 simple_label = ''.join(filter(str.isalnum, simple_label))
 
                 attrs = doc_attr.copy() #collect optional attributes
