@@ -20,6 +20,20 @@ def _multi_replace(s, replaces):
         s = re.sub('\s\s+', ' ', s)
     return s
 
+class codifier:
+
+    """
+    Codifies input text to numbers
+    """
+
+    def __init__(self):
+        self.codemapper = {}
+
+    def codify(self, text):
+        if text not in self.codemapper:
+            self.codemapper[text] = len(self.codemapper) + 1
+        return self.codemapper[text]
+
 def segment_matching_sents(doc_texts,
                            rootword_pattern,
                            reverse=False,
@@ -69,12 +83,14 @@ def segment_matching_sents(doc_texts,
             nlp = spacy.lang.en.English()
             nlp.add_pipe('sentencizer')
 
+    Codifier = codifier()
+
     matcher = spacy.matcher.Matcher(nlp.vocab)
     matcher.add('rootword', [rootword_pattern])
 
     doc_sents = []
 
-    for text in doc_texts:
+    for doc_text_i, text in enumerate(doc_texts):
 
         sent_tokens = []
 
@@ -90,7 +106,7 @@ def segment_matching_sents(doc_texts,
 
             for match_id, start, end in matches:
 
-                span = doc[start:end]
+                span = doc[start:end] #TODO: rename this to root_span
                 sent = span.sent
 
                 # All tokens after root word
@@ -103,8 +119,10 @@ def segment_matching_sents(doc_texts,
 
                     for token in sent:
 
-                        tokens.append({'_text': token.text,
-                                       '_whitespace': token.whitespace_})
+                        tokens.append({
+                            '_id': Codifier.codify(token.text),
+                            '_token_text': token.text,
+                            '_whitespace': token.whitespace_})
 
                     sent_tokens.append(tokens)
 
@@ -115,8 +133,10 @@ def segment_matching_sents(doc_texts,
 
                     for token in reversed(sent):
 
-                        tokens.append({'_text': token.text,
-                                       '_whitespace': token.whitespace_})
+                        tokens.append({
+                            '_id': Codifier.codify(token.text),
+                            '_token_text': token.text,
+                            '_whitespace': token.whitespace_})
 
                     sent_tokens.append(tokens)
 
@@ -180,13 +200,17 @@ def tree_from_list(doc_sents,
             for sent_token_i, sent_token in enumerate(sent_tokens):
 
                 cumulative_tokens = sent_tokens[0:sent_token_i + 1]
-                node_name = ''.join([x['_text'] for x in cumulative_tokens]).lower()
+
+                node_name = '_'.join([str(x['_id']) for x in cumulative_tokens])
+
+                simple_label = ''.join([str(x['_token_text']) for x in cumulative_tokens])
+                simple_label = ''.join(filter(str.isalnum, simple_label))
 
                 attrs = doc_attr.copy() #collect optional attributes
-                attrs.update(sent_token) #add _text and _whitespace
+                attrs.update(sent_token) #add _token_text and _whitespace
                 attrs.update({
                     '_node_name': node_name,
-                    '_simple_label': ''.join(filter(str.isalnum, node_name)),
+                    '_simple_label': simple_label,
                     '_ref': doc_ref})
 
                 sent_node_names.append(node_name)
@@ -229,7 +253,7 @@ def default_treestyle(tree,
         # Remove punct nodes
         # TODO: maybe this should be optional
         if len(node.get_children()) > 1: #junction
-            if node._text.strip() == ',' or node._text.strip() == '':
+            if node._token_text.strip() == ',' or node._token_text.strip() == '':
                 node.delete()
 
     #     # Remove any amount of newlines from node labels
@@ -252,7 +276,7 @@ def default_treestyle(tree,
                                  fontsize_min=8,
                                  fontsize_max=48):
 
-        name_face = ete3.TextFace(node._text)
+        name_face = ete3.TextFace(node._token_text)
 
         # Node margin is added to avoid nodes overlapping
         name_face.margin_left = node_margin
@@ -280,7 +304,7 @@ def default_treestyle(tree,
         # Handle highlighting
         bgcolor = (1, 1, 1, 1)
         for pattern, color in highlight_colors.items():
-            if re.search(pattern, node._text, re.IGNORECASE):
+            if re.search(pattern, node._token_text, re.IGNORECASE):
                 bgcolor = color
                 break
 
