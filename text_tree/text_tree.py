@@ -120,7 +120,7 @@ def segment_matching_sents(doc_texts,
                     for token in sent:
 
                         tokens.append({
-                            '_id': Codifier.codify(token.text),
+                            '_id': Codifier.codify(token.text.lower()),
                             '_token_text': token.text,
                             '_whitespace': token.whitespace_})
 
@@ -134,7 +134,7 @@ def segment_matching_sents(doc_texts,
                     for token in reversed(sent):
 
                         tokens.append({
-                            '_id': Codifier.codify(token.text),
+                            '_id': Codifier.codify(token.text.lower()),
                             '_token_text': token.text,
                             '_whitespace': token.whitespace_})
 
