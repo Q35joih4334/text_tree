@@ -359,7 +359,9 @@ def draw_tree(doc_texts,
               reverse=False,
               doc_refs=None,
               doc_attrs=None,
-              highlights=None):
+              highlights=None,
+              nlp=None,
+              sent_splitting='rule'):
 
     """
     Build text tree and save it as a file.
@@ -398,7 +400,11 @@ def draw_tree(doc_texts,
 
     # Extract matching sentences
     print('Extracting matching sentences.', end=' ')
-    doc_sents = segment_matching_sents(doc_texts, rootword_pattern, reverse=reverse)
+    doc_sents = segment_matching_sents(doc_texts, 
+                                       rootword_pattern, 
+                                       reverse=reverse,
+                                       nlp=nlp,
+                                       sent_splitting=sent_splitting)
 
     # Check for how many sentences were found
     total_matching_sentences = sum([len(x) for x in doc_sents])
