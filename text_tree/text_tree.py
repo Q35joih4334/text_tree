@@ -8,17 +8,12 @@ Created on Fri Sep 24 01:00:56 2021
 import re
 import itertools
 import spacy
+import spacy.lang.en
 import matplotlib
 import ete3
 
 def _perceived_luminance(r, g, b):
     return .299*r + .587*g + .114*b
-
-def _multi_replace(s, replaces):
-    for replace in replaces:
-        s = s.replace(replace, ' ')
-        s = re.sub('\s\s+', ' ', s)
-    return s
 
 class codifier:
 
@@ -122,21 +117,28 @@ def segment_matching_sents(doc_texts,
                         tokens.append({
                             '_id': Codifier.codify(token.text.lower()),
                             '_token_text': token.text,
-                            '_whitespace': token.whitespace_})
+                            '_whitespace': token.whitespace_,
+                            '_token_is_punct': token.is_punct})
 
                     sent_tokens.append(tokens)
 
                 # Rootword match in sentence end
                 # If all tokens after root word are non-words (apart from puncts)
                 # TODO: or whitespace?
+                # TODO: will this skip the sentence if after_tokens is empty?
                 elif all([x.is_punct for x in after_tokens]) and reverse:
 
                     for token in reversed(sent):
 
-                        tokens.append({
-                            '_id': Codifier.codify(token.text.lower()),
-                            '_token_text': token.text,
-                            '_whitespace': token.whitespace_})
+                        trailing_punct = token.i in [x.i for x in after_tokens]
+
+                        if not trailing_punct:
+
+                            tokens.append({
+                                '_id': Codifier.codify(token.text.lower()),
+                                '_token_text': token.text,
+                                '_whitespace': token.whitespace_,
+                                '_token_is_punct': token.is_punct})
 
                     sent_tokens.append(tokens)
 
@@ -231,6 +233,16 @@ def tree_from_list(doc_sents,
     for node in tree.traverse():
         node.add_features(**node_features[node.name])
 
+    # Clean up nodes
+    for node in tree.traverse():
+
+        # Remove punct nodes
+        # TODO: maybe this should be optional
+        #if len(node.get_children()) > 1: #junction
+        if len(node.get_leaves()) > 1:
+            if node._token_is_punct or node._token_text.strip() == '':
+                node.delete()
+
     return tree
 
 # TODO: this could be cleaned up
@@ -238,28 +250,15 @@ def tree_from_list(doc_sents,
 def default_treestyle(tree,
                       reverse=False,
                       highlights=None,
-                      cmap=matplotlib.cm.get_cmap('tab20')):
+                      cmap=matplotlib.cm.get_cmap('tab20'),
+                      sort_by_name=True,
+                      sort_by_topology=True):
 
     if not highlights:
         highlights = []
 
     cmap_colors = itertools.cycle([cmap(x) for x in range(cmap.N)])
     highlight_colors = {x.lower():next(cmap_colors) for x in highlights}
-
-    # Clean up nodes
-    # TODO: these could be removed at segmentation phase?
-    for node in tree.traverse():
-
-        # Remove punct nodes
-        # TODO: maybe this should be optional
-        if len(node.get_children()) > 1: #junction
-            if node._token_text.strip() == ',' or node._token_text.strip() == '':
-                node.delete()
-
-    #     # Remove any amount of newlines from node labels
-    #     # TODO: this will break if newlines are in the middle of sentence
-    #     if set(node._text) == set('\n'):
-    #         node.delete()
 
     # Hide nodes from tree visualization
     for node in tree.traverse():
@@ -271,12 +270,18 @@ def default_treestyle(tree,
     # TODO: these params should be accessible from default_treestyle
     def text_tree_default_layout(node,
                                  node_margin=.5,
-                                 space_margin=5,
+                                 space_margin_mult=.4,
                                  branch_margin=10,
                                  fontsize_min=8,
-                                 fontsize_max=48):
+                                 fontsize_max=96):
 
         name_face = ete3.TextFace(node._token_text)
+
+        # Handle font size change depending on leave count under the node
+        # Limit fontsize
+        leaf_count = len(node.get_leaves())
+        font_size = sorted([fontsize_min, leaf_count * fontsize_min, fontsize_max])[1]
+        name_face.fsize = font_size
 
         # Node margin is added to avoid nodes overlapping
         name_face.margin_left = node_margin
@@ -284,10 +289,10 @@ def default_treestyle(tree,
 
         # Add extra margin if node has whitespace
         if reverse and node._whitespace == ' ':
-            name_face.margin_left = space_margin
+            name_face.margin_left = space_margin_mult * font_size
 
         elif not reverse and node._whitespace == ' ':
-            name_face.margin_right = space_margin
+            name_face.margin_right = space_margin_mult * font_size
 
         # Add Additional margin in case node is at tree branch
         if len(node.get_sisters()) > 0:
@@ -295,11 +300,6 @@ def default_treestyle(tree,
 
         if len(node.get_children()) > 1: #junction
             name_face.margin_right = branch_margin
-
-        # Handle font size change depending on leave count under the node
-        # Limit fontsize
-        leaf_count = len(node.get_leaves())
-        name_face.fsize = sorted([fontsize_min, leaf_count * fontsize_min, fontsize_max])[1]
 
         # Handle highlighting
         bgcolor = (1, 1, 1, 1)
@@ -347,9 +347,14 @@ def default_treestyle(tree,
     else:
         ts.orientation = 0
 
+    # Sort
     # TODO: check if _simple_label exists in all nodes
     # NOTE: such check is actually not necessary if tree_from_list has been used
-    tree.sort_descendants('_simple_label')
+    if sort_by_name:
+        tree.sort_descendants('_simple_label')
+
+    if sort_by_topology:
+        tree.ladderize()
 
     return tree, ts
 
@@ -400,8 +405,8 @@ def draw_tree(doc_texts,
 
     # Extract matching sentences
     print('Extracting matching sentences.', end=' ')
-    doc_sents = segment_matching_sents(doc_texts, 
-                                       rootword_pattern, 
+    doc_sents = segment_matching_sents(doc_texts,
+                                       rootword_pattern,
                                        reverse=reverse,
                                        nlp=nlp,
                                        sent_splitting=sent_splitting)
